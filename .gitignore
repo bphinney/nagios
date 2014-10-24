@@ -1,4 +1,5 @@
 *.gem
+.zero-knife.rb
 *.rbc
 .bundle
 .config
@@ -38,4 +39,3 @@ vendor/
 #vagrant stuff
 .vagrant/
 .vagrant.d/
-

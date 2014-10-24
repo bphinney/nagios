@@ -2,8 +2,13 @@ nagios Cookbook CHANGELOG
 =========================
 This file is used to list changes made in each version of the nagios cookbook.
 
-v6.0.0 - CURRENTLY UNRELEASED
------------------------------
+v6.0.2
+------
+### Bug
+- Remove .DS_Store files in the supermarket file that caused failures on older versions of Berkshelf
+
+v6.0.0
+------
 ### Breaking changes
 - NRPE is no longer installed by the nagios cookbook.  This is handled by the NRPE cookbook.  Moving this logic allows for more fined grained control of how the two services are installed and configured
 - Previously the Nagios server was monitored out of the box using a NRPE check.  This is no longer the case since the cookbooks are split.  You'll need to add a services data bag to return this functionality
@@ -21,15 +26,25 @@ v6.0.0 - CURRENTLY UNRELEASED
 - Properly set the path for the p1.pl file on RHEL platforms
 - Ensure that the hostgroups array doesn't include duplicates in the even that an environment and role have the same name
 - Only template nagios.cfg once
+- Fix ocsp-command typo in nagios.cfg
+- Fix bug that prevented Apache2 recipe from completing
 
 ### Improvement
 - Readme cleanup
 - Created a new users_helper library to abstract much of the Ruby logic for building user lists out of the recipe
 - Avoid writing out empty comments in templates for data bag driven configs
+- Add a full chefignore file to help with Berkshelf
+- Better documented host_perfdata_command and service_perfdata_command in the README
+- Add possibility to configure default_service with options process_perf_data & action_url
+- Add possibility to configure default_host with options process_perf_data & action_url
+- Allow freshness_threshold and active_checks_enabled to be specified in templates
+- Added a generic service-template w/min req. params
 
 ### New Feature
 - New attribute node['nagios']['monitored_environments'] for specifying multiple environments you'd like to monitor
 - Allow using the exclusion hostgroup format used by Nagios when defining the hostgroup for a check
+- Host templates can now be defined via a new host_templates data bag.
+
 
 ### Development
 - Vagrantfile updated for Vagrant 1.5 format changes
@@ -45,7 +60,7 @@ v6.0.0 - CURRENTLY UNRELEASED
 v5.3.4
 ------
 ### Bug
-- Fixed two bugs that prevented Apache/NGINX web server setups from configuring correctly 
+- Fixed two bugs that prevented Apache/NGINX web server setups from configuring correctly
 
 v5.3.2
 ------
@@ -117,7 +132,7 @@ v5.1.0
 - **[COOK-3781](https://tickets.opscode.com/browse/COOK-3781)** Service escalations can now be written using wildcards.  See the readme for an example of this feature.
 - **[COOK-3702](https://tickets.opscode.com/browse/COOK-3702)** Multiple PagerDuty keys for different contacts can be defined via a new nagios_pagerduty data bag.  See the readme for more information on the new data bag and attributes for this feature.
 - **[COOK-3774](https://tickets.opscode.com/browse/COOK-3774)**Services can be limited to run on nagios servers in specific chef environments by adding a new "activate_check_in_environment" key to the services data bag.  See the Services section of the readme for an example.
-- **[CHEF-4702](https://tickets.opscode.com/browse/CHEF-4702)** Chef solo users can now user solo-search for data bag searchd (https://github.com/edelight/chef-solo-search) 
+- **[CHEF-4702](https://tickets.opscode.com/browse/CHEF-4702)** Chef solo users can now user solo-search for data bag searchd (https://github.com/edelight/chef-solo-search)
 
 v5.0.2
 ------
