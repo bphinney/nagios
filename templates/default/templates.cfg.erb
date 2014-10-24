@@ -100,13 +100,13 @@ define service{
   is_volatile                     1
   }
 
-define service{
-  name                            service-template
-  max_check_attempts              <%= nagios_attr(:default_service)[:max_check_attempts] %>
-  check_interval                  <%= nagios_interval(nagios_attr(:default_service)[:check_interval]) %>
-  retry_interval                  <%= nagios_interval(nagios_attr(:default_service)[:retry_interval]) %>
-  notification_interval           <%= nagios_interval(nagios_attr(:default_service)[:notification_interval]) %>
-}
+#define service{
+#  name                            service-template
+#  max_check_attempts              <%= nagios_attr(:default_service)[:max_check_attempts] %>
+#  check_interval                  <%= nagios_interval(nagios_attr(:default_service)[:check_interval]) %>
+#  retry_interval                  <%= nagios_interval(nagios_attr(:default_service)[:retry_interval]) %>
+#  notification_interval           <%= nagios_interval(nagios_attr(:default_service)[:notification_interval]) %>
+#}
 
 <% @templates.each do |template| -%>
 <% if template == @templates.first -%># Templates defined by data bags<% end -%>
