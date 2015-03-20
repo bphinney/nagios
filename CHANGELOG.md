@@ -2,6 +2,89 @@ nagios Cookbook CHANGELOG
 =========================
 This file is used to list changes made in each version of the nagios cookbook.
 
+7.0.4
+-----
+### Bug
+- Fixed the order for resource.cfg population to be correct.
+
+7.0.2
+-----
+### Bug
+- Fixed the hardcoded cgi-bin path in server source.
+- Fixed contact_groups within load_default_config recipe.
+- Removed dead code from timeperiod.rb library.
+- Ignore timeperiods that don't comply.
+- Making time formats less restrictive. (#336)
+
+### Improvement
+- Make yum-epel recipe include optional via attribute.
+- Only allow_empty_hostgroup_assignment for Nagios versions >= 3.4.0
+
+7.0.0
+-----
+### Feature
+- Added providers for all nagios configuration objects.
+- Added wiki pages explaining the providers.
+- Added wiki pages explaining the databags.
+
+### Development
+- Updated chefspec (4.2.0)
+
+### Extra note
+- Please test this version before using it in production. Some logic and attributes have changes, so this might break your current setup.
+
+6.1.2
+----------
+### Feature
+- Allow defining parents in the unmanaged hosts data bag so you can build the host map.
+
+### Bug
+- Setup Apache2 before trying to configure the webserver so paths will be created
+- Installed EPEL on RHEL so package installs work
+- Set the Apache log dir to that provided by Apache since the Nagios log dir is now locked down to just the nagios user / group
+- Template the resource.cfg file on RHEL platforms to prevent check failures
+- Fix cgi-bin page loads on RHEL systems
+- Fix CSS files not loading on Debian based systems
+
+### Development
+- Updated Test Kitchen dependency to 1.3.1 from 1.2.1
+
+6.1.0
+-----
+
+### Bug
+- Fix missing CSS files on RHEL/Fedora package installs
+- Ensure the source file for Nagios is always downloaded to work around corrupt partial downloads
+- Fixed permissions being changed on the resource directory during each run on RHEL systems
+
+### Improvement
+- Remove support for SSL V2 / V3 (Apache2/NGINX) and add TLS 1.1 and 1.2 (NGINX)
+- Cleaned up and removed duplicate code from the web server configuration
+
+### New Features
+- Added the ability to tag nodes with an attribute that excludes them from the monitoring search.  See readme for details
+
+### Breaking Changes
+- The /nagios or /nagios3 URLs are no longer valid.  Nagios should be installed on the root of the webserver and this never entirely worked
+
+### Development
+- Updated Rubocop rules
+- Fixed specs to run with Chefspec 4.X
+
+v6.0.4
+------
+### Bug
+- Fix normalized hostnames not normalizing the hostgroups
+- Don't register the service templates so that Nagios will start properly
+- Require Apache2 cookbook version 2.0 or greater due to breaking changes with how site.conf files are handled
+
+### Improvement
+- Added additional options for perfdata
+
+### New Feature
+- Added the ability to specify a URL to download patches that will be applied to the source install prior to compliation
+
+
 v6.0.2
 ------
 ### Bug

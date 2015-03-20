@@ -1,6 +1,6 @@
 #
 # Author:: Seth Chisamore <schisamo@getchef.com>
-# Author:: Tim Smith <tsmith@limelight.com>
+# Author:: Tim Smith <tim@cozy.co>
 # Cookbook Name:: nagios
 # Recipe:: server_package
 #
@@ -20,10 +20,8 @@
 #
 
 case node['platform_family']
-when 'rhel', 'fedora'
-  unless platform?('fedora') && node['platform_version'] < 17
-    include_recipe 'yum-epel' # setup epel on old rhel and pre Fedora 17
-  end
+when 'rhel'
+  include_recipe 'yum-epel' if node['nagios']['server']['install_yum-epel']
 when 'debian'
   # Nagios package requires to enter the admin password
   # We generate it randomly as it's overwritten later in the config templates

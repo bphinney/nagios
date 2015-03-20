@@ -3,7 +3,7 @@
 # Author:: Joshua Timberman <joshua@getchef.com>
 # Author:: Nathan Haneysmith <nathan@getchef.com>
 # Author:: Seth Chisamore <schisamo@getchef.com>
-# Author:: Tim Smith <tsmith@limelight.com>
+# Author:: Tim Smith <tim@cozy.co>
 # Cookbook Name:: nagios
 # Recipe:: default
 #
@@ -30,6 +30,9 @@ else
   nagios_service_name = node['nagios']['server']['service_name']
 end
 
+# install nagios service either from source of package
+include_recipe "nagios::server_#{node['nagios']['server']['install_method']}"
+
 # configure either Apache2 or NGINX
 case node['nagios']['server']['web_server']
 when 'nginx'
@@ -48,14 +51,11 @@ else
   fail 'Unknown web server option provided for Nagios server'
 end
 
-# install nagios service either from source of package
-include_recipe "nagios::server_#{node['nagios']['server']['install_method']}"
-
 # use the users_helper.rb library to build arrays of users and contacts
 nagios_users = NagiosUsers.new(node)
 
 Chef::Log.fatal("Could not find users in the \"#{node['nagios']['users_databag']}\" databag with the \"#{node['nagios']['users_databag_group']}\"" \
-                'group. Users must be defined to allow for logins to the UI. Make sure the databag exists and, if you have set the ' \
+                ' group. Users must be defined to allow for logins to the UI. Make sure the databag exists and, if you have set the ' \
                 "\"users_databag_group\", that users in that group exist.") if nagios_users.users.empty?
 
 # configure the appropriate authentication method for the web server
@@ -97,132 +97,27 @@ else
   end
 end
 
-# Find environments to search if excluding environments
-unless node['nomonitoring'].nil? || node['nomonitoring'].empty?
-  noenvirons = node['nomonitoring']
-  mon_environs = []
-  search(:environment, "name:*").each do |environment|
-    unless noenvirons.any?{ |str| environment.name.include? str }
-      mon_environs << environment.name
-    end
-    mon_environs = mon_environs.sort.uniq
-  end
-end 
-
-# find nodes to monitor.  Search in all environments if multi_environment_monitoring is enabled
-Chef::Log.info('Beginning search for nodes.  This may take some time depending on your node count')
-nodes = []
-hostgroups = []
-multi_env = node['nagios']['monitored_environments']
-multi_env_search = multi_env.empty? ? '' : ' AND (chef_environment:' + multi_env.join(' OR chef_environment:') + ')'
-
-if node['nagios']['multi_environment_monitoring']
-  unless mon_environs.nil? || mon_environs.empty?
-    mon_environs.each do |env|
-      search(:node, "name:* AND chef_environment:#{env}").each do |node|
-        nodes << node
-      end
-    end
-  else
-    nodes = search(:node, "name:*#{multi_env_search}")
-  end
-else
-  nodes = search(:node, "name:* AND chef_environment:#{node.chef_environment}")
-end
-
-if nodes.empty?
-  Chef::Log.info('No nodes returned from search, using this node so hosts.cfg has data')
-  nodes << node
-end
-
-# Sort by name to provide stable ordering
-nodes.sort! { |a, b| a.name <=> b.name }
-
-# maps nodes into nagios hostgroups
-service_hosts = {}
-search(:role, '*:*') do |r|
-  hostgroups << r.name
-  nodes.select { |n| n['roles'].include?(r.name) if n['roles'] }.each do |n|
-    service_hosts[r.name] = n[node['nagios']['host_name_attribute']]
+# Setting all general options
+unless node['nagios'].nil?
+  unless node['nagios']['server'].nil?
+    Nagios.instance.normalize_hostname = node['nagios']['server']['normalize_hostname']
   end
 end
 
-# if using multi environment monitoring add all environments to the array of hostgroups
-if node['nagios']['multi_environment_monitoring']
-  search(:environment, '*:*') do |e|
-    unless node['nomonitoring'].any?{ |str| e.name.include? str }
-      hostgroups << e.name unless hostgroups.include?(e.name)
-      nodes.select { |n| n.chef_environment == e.name }.each do |n|
-        service_hosts[e.name] = n[node['nagios']['host_name_attribute']]
-      end
-    end
-  end
+# loading all databag configurations
+if node['nagios']['server']['load_databag_config']
+  include_recipe 'nagios::_load_databag_config'
 end
 
-# Add all unique platforms to the array of hostgroups
-nodes.each do |n|
-  hostgroups << n['os'] unless hostgroups.include?(n['os']) || n['os'].nil?
-end
-
-# Hack to deal with the nagios server being the first linux system
-hostgroups << node['os'] unless hostgroups.include?(node['os']) || node['os'].nil?
-
-nagios_bags         = NagiosDataBags.new
-services            = nagios_bags.get(node['nagios']['services_databag'])
-servicegroups       = nagios_bags.get(node['nagios']['servicegroups_databag'])
-templates           = nagios_bags.get(node['nagios']['templates_databag'])
-hosttemplates           = nagios_bags.get(node['nagios']['hosttemplates_databag'])
-eventhandlers       = nagios_bags.get(node['nagios']['eventhandlers_databag'])
-unmanaged_hosts     = nagios_bags.get(node['nagios']['unmanagedhosts_databag'])
-serviceescalations  = nagios_bags.get(node['nagios']['serviceescalations_databag'])
-hostescalations     = nagios_bags.get(node['nagios']['hostescalations_databag'])
-contacts            = nagios_bags.get(node['nagios']['contacts_databag'])
-contactgroups       = nagios_bags.get(node['nagios']['contactgroups_databag'])
-servicedependencies = nagios_bags.get(node['nagios']['servicedependencies_databag'])
-timeperiods         = nagios_bags.get(node['nagios']['timeperiods_databag'])
-
-# Add unmanaged host hostgroups to the hostgroups array if they don't already exist
-unmanaged_hosts.each do |host|
-  host['hostgroups'].each do |hg|
-    hostgroups << hg unless hostgroups.include?(hg)
-  end
-end
-
-# Load search defined Nagios hostgroups from the nagios_hostgroups data bag and find nodes
-hostgroup_nodes = {}
-hostgroup_list = []
-if nagios_bags.bag_list.include?('nagios_hostgroups')
-  search(:nagios_hostgroups, '*:*') do |hg|
-    hostgroup_list << hg['hostgroup_name']
-    temp_hostgroup_array = Array.new
-    if node['nagios']['multi_environment_monitoring']
-      search(:node, hg['search_query']) do |n|
-        unless noenvirons.any?{ |str| n.chef_environment.include? str }
-          temp_hostgroup_array << n[node['nagios']['host_name_attribute']]
-        end
-      end
-    else
-      search(:node, "#{hg['search_query']} AND chef_environment:#{node.chef_environment}") do |n|
-        temp_hostgroup_array << n[node['nagios']['host_name_attribute']]
-      end
-    end
-    hostgroup_nodes[hg['hostgroup_name']] = temp_hostgroup_array.join(',')
-  end
+# loading default configuration data
+if node['nagios']['server']['load_default_config']
+  include_recipe 'nagios::_load_default_config'
 end
 
 directory "#{node['nagios']['conf_dir']}/dist" do
   owner node['nagios']['user']
   group node['nagios']['group']
   mode '0755'
-end
-
-# resource.cfg differs on RPM and tarball based systems
-if node['platform_family'] == 'rhel' || node['platform_family'] == 'fedora'
-  directory node['nagios']['resource_dir'] do
-    owner 'root'
-    group node['nagios']['group']
-    mode '0750'
-  end
 end
 
 directory node['nagios']['state_dir'] do
@@ -270,54 +165,34 @@ nagios_conf 'cgi' do
   variables(:nagios_service_name => nagios_service_name)
 end
 
-nagios_conf 'timeperiods' do
-  variables(:timeperiods => timeperiods)
+# Update all items before writing the templates
+nagios_resourcelist_items 'update'
+
+# resource.cfg differs on RPM and tarball based systems
+if node['platform_family'] == 'rhel' || node['platform_family'] == 'fedora'
+  template "#{node['nagios']['resource_dir']}/resource.cfg" do
+    source 'resource.cfg.erb'
+    owner node['nagios']['user']
+    group node['nagios']['group']
+    mode '0600'
+  end
+
+  directory node['nagios']['resource_dir'] do
+    owner 'root'
+    group node['nagios']['group']
+    mode '0755'
+  end
 end
 
-nagios_conf 'templates' do
-  variables(:templates => templates,
-            :hosttemplates => hosttemplates)
-end
-
-nagios_conf 'commands' do
-  variables(:services => services,
-            :eventhandlers => eventhandlers)
-end
-
-nagios_conf 'services' do
-  variables(:services => services,
-            :search_hostgroups => hostgroup_list,
-            :hostgroups => hostgroups)
-end
-
-nagios_conf 'servicegroups' do
-  variables(:servicegroups => servicegroups)
-end
-
-nagios_conf 'contacts' do
-  variables(:admins => nagios_users.users,
-            :members => nagios_users.return_user_contacts,
-            :contacts => contacts,
-            :contactgroups => contactgroups,
-            :serviceescalations => serviceescalations,
-            :hostescalations => hostescalations)
-end
-
-nagios_conf 'hostgroups' do
-  variables(:hostgroups => hostgroups,
-            :search_hostgroups => hostgroup_list,
-            :search_nodes => hostgroup_nodes)
-end
-
-nagios_conf 'hosts' do
-  variables(:nodes => nodes,
-            :unmanaged_hosts => unmanaged_hosts,
-            :hostgroups => hostgroups)
-end
-
-nagios_conf 'servicedependencies' do
-  variables(:servicedependencies => servicedependencies)
-end
+nagios_conf 'timeperiods'
+nagios_conf 'contacts'
+nagios_conf 'commands'
+nagios_conf 'hosts'
+nagios_conf 'hostgroups'
+nagios_conf 'templates'
+nagios_conf 'services'
+nagios_conf 'servicegroups'
+nagios_conf 'servicedependencies'
 
 service 'nagios' do
   service_name nagios_service_name
